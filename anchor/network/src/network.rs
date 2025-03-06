@@ -33,6 +33,7 @@ use crate::{handshake, peer_manager, Config, Enr};
 
 use crate::network::NetworkError::{Gossipsub, SwarmConfig};
 use message_validator::ValidatorService;
+use ssv_types::domain_type::DomainType;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -65,6 +66,7 @@ pub struct Network<V: ValidatorService> {
     node_info: NodeInfo,
     message_validator: Arc<V>,
     results_rx: mpsc::Receiver<message_validator::Outcome>,
+    domain_type: DomainType,
 }
 
 impl<V: ValidatorService> Network<V> {
@@ -110,6 +112,7 @@ impl<V: ValidatorService> Network<V> {
             node_info,
             message_validator: Arc::new(message_validator),
             results_rx,
+            domain_type: config.domain_type.clone(),
         };
 
         info!(%peer_id, "Network starting");
