@@ -5406,6 +5406,7 @@ dependencies = [
  "lighthouse_network",
  "message_validator",
  "quick-protobuf",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "ssv_types",
