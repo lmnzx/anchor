@@ -286,17 +286,19 @@ impl Client {
         // Initialize the number of connected, avaliable beacon nodes to 0.
         set_gauge(&validator_metrics::AVAILABLE_BEACON_NODES_COUNT, 0);
 
+        // TODO: make beacon_node_fallback::Config and broadcast_topics configurable
+        // https://github.com/sigp/anchor/issues/248
         let mut beacon_nodes: BeaconNodeFallback<_> = BeaconNodeFallback::new(
             candidates,
-            beacon_node_fallback::Config::default(), // TODO make configurable
-            vec![ApiTopic::Subscriptions],           // TODO make configurable
+            beacon_node_fallback::Config::default(),
+            vec![ApiTopic::Subscriptions],
             spec.clone(),
         );
 
         let mut proposer_nodes: BeaconNodeFallback<_> = BeaconNodeFallback::new(
             proposer_candidates,
-            beacon_node_fallback::Config::default(), // TODO make configurable
-            vec![ApiTopic::Subscriptions],           // TODO make configurable
+            beacon_node_fallback::Config::default(),
+            vec![ApiTopic::Subscriptions],
             spec.clone(),
         );
 
@@ -419,13 +421,14 @@ impl Client {
         );
 
         // Start the p2p network
-        let network = Network::try_new(
+        let network = Network::try_new::<E>(
             &config.network,
             subnet_tracker,
             network_rx,
             Arc::new(message_receiver),
             outcome_rx,
             executor.clone(),
+            &spec,
         )
         .await
         .map_err(|e| format!("Unable to start network: {e}"))?;
@@ -542,9 +545,12 @@ impl Client {
             .start_update_service(&spec)
             .map_err(|e| format!("Unable to start preparation service: {}", e))?;
 
-        // TODO: reuse this from lighthouse as soon as tracing is merged
+        // TODO: reuse this from lighthouse
+        // https://github.com/sigp/anchor/issues/251
         // spawn_notifier(self).map_err(|e| format!("Failed to start notifier: {}", e))?;
-        //
+
+        // TODO: reuse this from lighthouse
+        // https://github.com/sigp/anchor/issues/250
         // if self.config.enable_latency_measurement_service {
         //     latency::start_latency_service(
         //         self.context.clone(),
@@ -790,7 +796,6 @@ fn read_or_generate_private_key(
                 key_string
             };
 
-            // TODO support passphrase
             Rsa::private_key_from_pem(key_string.as_ref())
                 .map_err(|e| format!("Unable to read private key: {e:?}"))
         }
