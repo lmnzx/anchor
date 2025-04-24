@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use api_types::{CommitteeData, GenericResponse, ValidatorData, VersionData};
 use axum::{extract::State, routing::get, Json, Router};
+use eth2::lighthouse::Health;
+use health_metrics::observe::Observe;
 use parking_lot::RwLock;
 use ssv_types::CommitteeId;
 use version::version_with_platform;
@@ -16,6 +18,7 @@ pub fn new(shared_state: Arc<RwLock<Shared>>) -> Router {
     Router::new()
         .route("/", get(root))
         .route("/anchor/version", get(get_version))
+        .route("/anchor/health", get(get_health))
         .route("/anchor/validators", get(get_validators))
         .route("/anchor/committees", get(get_committees))
         .with_state(shared_state)
@@ -30,6 +33,10 @@ async fn get_version() -> Json<GenericResponse<VersionData>> {
     Json(GenericResponse::from(VersionData {
         version: version_with_platform(),
     }))
+}
+
+async fn get_health() -> Json<GenericResponse<Result<Health, String>>> {
+    Json(GenericResponse::from(Health::observe()))
 }
 
 async fn get_validators(
