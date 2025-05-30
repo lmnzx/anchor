@@ -26,7 +26,7 @@ pub(crate) fn validate_consensus_message(
         validation_context.signed_ssv_message.ssv_message().data(),
     ) {
         Ok(msg) => msg,
-        Err(_) => return Err(ValidationFailure::UndecodableMessageData),
+        Err(err) => return Err(ValidationFailure::UndecodableMessageData(err)),
     };
 
     // Call the existing semantic validation
@@ -671,7 +671,7 @@ mod tests {
 
         assert_validation_error(
             result,
-            |failure| matches!(failure, ValidationFailure::UndecodableMessageData),
+            |failure| matches!(failure, ValidationFailure::UndecodableMessageData(_)),
             "UndecodableMessageData",
         );
     }

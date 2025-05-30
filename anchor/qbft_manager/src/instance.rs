@@ -256,13 +256,18 @@ pub async fn qbft_instance<D: QbftData<Hash = Hash256>>(
         // Handle message, round end, or closed queue. Keep the drop guard if we have one.
         let guard = match recv_result {
             RecvResult::Message(msg) => {
-                debug!(msg = ?msg.kind, "Handling message in qbft_instance");
                 match msg.kind {
                     QbftMessageKind::Initialize(initialization) => {
+                        debug!(msg_id = ?initialization.message_id, "Received initialization message");
                         instance = instance.initialize(initialization, &message_sender).await;
                     }
                     // We got a new network message, this should be passed onto the instance
                     QbftMessageKind::NetworkMessage(message) => {
+                        // We use `WrappedQbftMessage`'s `Display` implementation here for a brief
+                        // summary of the most important fields. This is brief enough for reasonable
+                        // log file size while maintaining debuggability for the testing phase.
+                        // Can be removed as Anchor approaches maturity.
+                        debug!(msg = %message, "Received message in qbft_instance");
                         instance.receive(message);
                     }
                 }

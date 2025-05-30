@@ -26,7 +26,7 @@ pub(crate) fn validate_partial_signature_message(
         validation_context.signed_ssv_message.ssv_message().data(),
     ) {
         Ok(msgs) => msgs,
-        Err(_) => return Err(ValidationFailure::UndecodableMessageData),
+        Err(err) => return Err(ValidationFailure::UndecodableMessageData(err)),
     };
 
     // Validate basic semantics
