@@ -1888,7 +1888,7 @@ dependencies = [
  "ssv_network_config",
  "ssv_types",
  "strum 0.27.1",
- "subnet_tracker",
+ "subnet_service",
  "task_executor",
  "tokio",
  "tracing",
@@ -5196,7 +5196,7 @@ dependencies = [
  "processor",
  "slot_clock",
  "ssv_types",
- "subnet_tracker",
+ "subnet_service",
  "tokio",
  "tracing",
 ]
@@ -5535,7 +5535,7 @@ dependencies = [
  "serde_json",
  "ssv_types",
  "ssz_types",
- "subnet_tracker",
+ "subnet_service",
  "task_executor",
  "thiserror 2.0.12",
  "tokio",
@@ -7800,17 +7800,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "subnet_tracker"
+name = "subnet_service"
 version = "0.1.0"
 dependencies = [
  "alloy",
  "database",
  "ethereum_serde_utils",
  "serde",
+ "slot_clock",
  "ssv_types",
  "task_executor",
  "tokio",
  "tracing",
+ "types",
 ]
 
 [[package]]

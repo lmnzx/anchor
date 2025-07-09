@@ -558,11 +558,20 @@ pub struct Node {
 
     #[clap(
         long,
-        help = "Disables peer scoring altogether.",
+        help = "Disables gossipsub peer scoring.",
         display_order = 0,
         help_heading = FLAG_HEADER
     )]
-    pub disable_peer_scoring: bool,
+    pub disable_gossipsub_peer_scoring: bool,
+
+    #[clap(
+        long,
+        help = "Disables gossipsub topic scoring.",
+        action = ArgAction::Set,
+        default_value = "true",
+        hide = true
+    )]
+    pub disable_gossipsub_topic_scoring: bool,
 
     #[clap(flatten)]
     pub logging_flags: LoggingFlags,
