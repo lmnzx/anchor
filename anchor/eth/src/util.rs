@@ -168,7 +168,6 @@ pub fn validate_operators(
         .iter()
         .any(|id| !network_state.operator_exists(id))
     {
-        error!(cluster_id = ?cluster_id, "One or more operators do not exist");
         return Err(ExecutionError::Database(
             "One or more operators do not exist".to_string(),
         ));
