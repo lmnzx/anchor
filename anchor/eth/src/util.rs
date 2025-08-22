@@ -11,7 +11,7 @@ use reqwest::Client;
 use sensitive_url::SensitiveUrl;
 use ssv_types::{ClusterId, ENCRYPTED_KEY_LENGTH, OperatorId, Share, ValidatorMetadata};
 use tower::ServiceBuilder;
-use tracing::{debug, error, trace};
+use tracing::{debug, trace};
 use types::{Graffiti, PublicKeyBytes, Signature};
 
 use crate::{error::ExecutionError, sync::MAX_OPERATORS};
