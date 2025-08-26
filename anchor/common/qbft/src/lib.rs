@@ -834,11 +834,17 @@ where
             }
 
             for justification in qbft_msg.round_change_justification.iter() {
-                self.is_valid_prepare_justification_for_round_and_root(
+                if !self.is_valid_prepare_justification_for_round_and_root(
                     justification,
                     round,
                     &qbft_msg.root,
-                );
+                ) {
+                    debug!(
+                        from = *operator_id,
+                        "ROUNDCHANGE has invalid prepare justification"
+                    );
+                    return;
+                }
             }
         }
 
