@@ -550,7 +550,7 @@ where
         // prepare justifications
         if let Some(max_prepared_msg) = max_prepared_msg {
             // Make sure we have a quorum of prepare messages
-            if self.check_quorum(&msg.qbft_message.prepare_justification) {
+            if !self.check_quorum(&msg.qbft_message.prepare_justification) {
                 warn!(
                     num_justifications = msg.qbft_message.prepare_justification.len(),
                     "Not enough prepare messages for quorum"
