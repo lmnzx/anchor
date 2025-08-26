@@ -811,7 +811,6 @@ where
 
         let qbft_msg = &wrapped_msg.qbft_message;
         // If this is a "prepared" round change, we have to check the justifications.
-        // see https://github.com/ssvlabs/ssv/blob/7999b26308990b3f364d60e1618a8b6cf5b2d3e6/protocol/v2/qbft/instance/round_change.go#L304
         if qbft_msg.data_round > 0 {
             if !self.check_quorum(&qbft_msg.round_change_justification) {
                 debug!(
