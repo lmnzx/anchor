@@ -78,7 +78,7 @@ impl MessageContainer {
     /// Count the number of messages we have received for this round
     pub fn first_partial_quorum_above_round(&self, round: Round, partial: usize) -> Option<Round> {
         let mut operators_seen = HashSet::new();
-        for (&round, msgs) in self.messages.range((round + 1)..) {
+        for (&round, msgs) in self.messages.range((round + 1)..).rev() {
             for &operator in msgs.keys() {
                 operators_seen.insert(operator);
             }
