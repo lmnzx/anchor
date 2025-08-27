@@ -696,11 +696,18 @@ where
             return;
         }
 
-        // Make sure that we have accepted a proposal for this round
-        if !self.proposal_accepted_for_current_round {
-            warn!(from=?operator_id, ?self.state, "Have not accepted Proposal for current round yet");
+        // If we have accepted a proposal, check that the commit matches it
+        // But allow commits without proposal (for catch-up scenarios)
+        if self.proposal_accepted_for_current_round {
+            if let Some(accepted_root) = self.proposal_root {
+                if wrapped_msg.qbft_message.root != accepted_root {
+                    return;
+                }
+            }
+        } else {
+            debug!(from=?operator_id, ?self.state, "Have not accepted Proposal for current round yet");
             return;
-        }
+        };
 
         debug!(from = ?operator_id, state = ?self.state, "COMMIT received");
 
@@ -716,17 +723,33 @@ where
         if let Some(hash) = self.commit_container.has_quorum(round) {
             // Make sure that the root of the data that we have come to a commit consensus on
             // matches the root of the proposal that we have accepted
-            let proposal_root = match self.state {
-                InstanceState::Prepare { proposal_root } => proposal_root,
-                InstanceState::Commit { proposal_root } => proposal_root,
-                _ => {
-                    warn!(from=?operator_id, ?self.state, "Not in PREPARE or COMMIT state");
-                    return;
+            match self.state {
+                InstanceState::Commit { proposal_root } => {
+                    // We already accepted a proposal and are in commit state
+                    if hash != proposal_root {
+                        warn!("COMMIT quorum root does not match accepted PROPOSAL root");
+                        return;
+                    }
                 }
-            };
-            if hash != proposal_root {
-                warn!("COMMIT quorum root does not match accepted PROPOSAL root");
-                return;
+                InstanceState::Prepare { proposal_root } => {
+                    // Transition to Commit state first
+                    if hash != proposal_root {
+                        warn!("COMMIT quorum root does not match accepted PROPOSAL root");
+                        return;
+                    }
+                    self.state = InstanceState::Commit { proposal_root };
+                }
+                InstanceState::AwaitingProposal => {
+                    // Catch-up scenario: we have commit quorum without seeing proposal
+                    // This is valid - we can decide based on commit quorum alone
+                    // Transition directly to Commit state
+                    debug!("Received commit quorum without proposal - catch-up scenario");
+                    self.state = InstanceState::Commit {
+                        proposal_root: hash,
+                    };
+                    self.proposal_root = Some(hash);
+                }
+                _ => return,
             }
 
             // Aggregate all of the commit messages
