@@ -1004,7 +1004,7 @@ where
     }
 
     // Get all of the round change jusitifcation messages
-    pub(crate) fn get_round_change_justifications(&self) -> Vec<SignedSSVMessage> {
+    fn get_round_change_justifications(&self) -> Vec<SignedSSVMessage> {
         // Short circuit if we are in first round
         if self.current_round <= Round::default() {
             return vec![];
@@ -1020,9 +1020,6 @@ where
 
             // We need at least a quorum of round changes to justify the proposal
             if round_changes.len() >= self.config.quorum_size() {
-                // Include ALL round change messages for the round in the order they were received
-                // IMPORTANT: Go does NOT sort these messages - it preserves insertion order
-                // This means tests "order 1" and "order 2" will produce DIFFERENT outputs
                 return round_changes
                     .into_iter()
                     .map(|msg| msg.signed_message.clone())
@@ -1034,7 +1031,7 @@ where
 
     /// Get justifications for a RoundChange message
     /// If we have prepared a value, include the Prepare messages that justify it
-    pub(crate) fn get_round_change_prepare_justifications(&self) -> Vec<SignedSSVMessage> {
+    fn get_round_change_prepare_justifications(&self) -> Vec<SignedSSVMessage> {
         // Only include prepare justifications if we have a prepared value
         if let (Some(last_prepared_value), Some(last_prepared_round)) =
             (self.last_prepared_value, self.last_prepared_round)
