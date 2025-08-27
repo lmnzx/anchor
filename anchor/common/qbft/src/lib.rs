@@ -746,16 +746,6 @@ where
                     }
                     self.state = InstanceState::Commit { proposal_root };
                 }
-                InstanceState::AwaitingProposal => {
-                    // Catch-up scenario: we have commit quorum without seeing proposal
-                    // This is valid - we can decide based on commit quorum alone
-                    // Transition directly to Commit state
-                    debug!("Received commit quorum without proposal - catch-up scenario");
-                    self.state = InstanceState::Commit {
-                        proposal_root: hash,
-                    };
-                    self.proposal_root = Some(hash);
-                }
                 _ => return,
             }
 
