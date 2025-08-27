@@ -43,7 +43,7 @@ impl MessageContainer {
         }
 
         let mut msg = msg.clone();
-        // We have no longer have need for full data in these messages
+        // We no longer have need for full data in these messages
         msg.signed_message.set_full_data(vec![]);
 
         self.values_by_round
