@@ -696,18 +696,25 @@ where
             return;
         }
 
-        // If we have accepted a proposal, check that the commit matches it
-        // But allow commits without proposal (for catch-up scenarios)
-        if self.proposal_accepted_for_current_round {
-            if let Some(accepted_root) = self.proposal_root
-                && wrapped_msg.qbft_message.root != accepted_root
-            {
+        // Handle commit message, checking proposal acceptance and catch-up scenarios.
+
+        // If we have NOT accepted a proposal for this round, this is a catch-up scenario.
+        // We allow commits without having seen a proposal in this case.
+        if !self.proposal_accepted_for_current_round {
+            debug!(from=?operator_id, ?self.state, "Have not accepted Proposal for current round yet (catch-up scenario)");
+            return;
+        }
+
+        // Proposal accepted: ensure commit matches the accepted proposal root.
+        if let Some(accepted_root) = self.proposal_root {
+            if wrapped_msg.qbft_message.root != accepted_root {
+                warn!(from=?operator_id, ?self.state, "Commit root does not match accepted Proposal root");
                 return;
             }
         } else {
-            debug!(from=?operator_id, ?self.state, "Have not accepted Proposal for current round yet");
+            warn!(from=?operator_id, ?self.state, "Proposal accepted, but no proposal root found");
             return;
-        };
+        }
 
         debug!(from = ?operator_id, state = ?self.state, "COMMIT received");
 
