@@ -699,10 +699,10 @@ where
         // If we have accepted a proposal, check that the commit matches it
         // But allow commits without proposal (for catch-up scenarios)
         if self.proposal_accepted_for_current_round {
-            if let Some(accepted_root) = self.proposal_root {
-                if wrapped_msg.qbft_message.root != accepted_root {
-                    return;
-                }
+            if let Some(accepted_root) = self.proposal_root
+                && wrapped_msg.qbft_message.root != accepted_root
+            {
+                return;
             }
         } else {
             debug!(from=?operator_id, ?self.state, "Have not accepted Proposal for current round yet");
@@ -730,7 +730,6 @@ where
                         warn!("COMMIT quorum root does not match accepted PROPOSAL root");
                         return;
                     }
-                    return;
                 }
                 InstanceState::Prepare { proposal_root } => {
                     // Transition to Commit state first
