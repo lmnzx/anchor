@@ -43,6 +43,10 @@ impl MessageContainer {
             return false; // Duplicate message
         }
 
+        let mut msg = msg.clone();
+        // We have no longer have need for full data in these messages
+        msg.signed_message.set_full_data(vec![]);
+
         // Add message and track its value
         self.messages
             .entry(round)
