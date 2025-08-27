@@ -818,7 +818,7 @@ where
             //    message
             let round = self
                 .round_change_container
-                .first_partial_quorum_above_round(round, self.config.get_f() + 1);
+                .first_partial_quorum_above_round(self.current_round, self.config.get_f() + 1);
             if let Some(round) = round
                 && !(matches!(self.state, InstanceState::SentRoundChange))
             {
