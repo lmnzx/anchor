@@ -82,7 +82,7 @@ impl MessageContainer {
             for &operator in msgs.keys() {
                 operators_seen.insert(operator);
             }
-            if partial >= self.quorum_size {
+            if operators_seen.len() >= partial {
                 return Some(round);
             }
         }
