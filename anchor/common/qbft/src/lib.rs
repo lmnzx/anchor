@@ -730,6 +730,7 @@ where
                         warn!("COMMIT quorum root does not match accepted PROPOSAL root");
                         return;
                     }
+                    return;
                 }
                 InstanceState::Prepare { proposal_root } => {
                     // Transition to Commit state first
