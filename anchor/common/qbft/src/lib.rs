@@ -821,7 +821,6 @@ where
                 .highest_partial_quorum_above_round(self.current_round, self.config.get_f() + 1);
             if let Some(round) = round
                 && round > self.current_round
-                && !(matches!(self.state, InstanceState::SentRoundChange))
             {
                 self.state = InstanceState::SentRoundChange;
                 self.current_round = round;
