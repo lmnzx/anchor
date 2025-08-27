@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use ssv_types::OperatorId;
 use types::Hash256;
@@ -9,7 +9,7 @@ use crate::{Round, WrappedQbftMessage};
 #[derive(Default)]
 pub struct MessageContainer {
     /// Messages indexed by round and then by sender
-    messages: HashMap<Round, HashMap<OperatorId, WrappedQbftMessage>>,
+    messages: BTreeMap<Round, HashMap<OperatorId, WrappedQbftMessage>>,
     /// Track unique values per round
     values_by_round: HashMap<Round, HashSet<Hash256>>,
     /// The quorum size for the qbft instance
@@ -21,7 +21,7 @@ impl MessageContainer {
     pub fn new(quorum_size: usize) -> Self {
         Self {
             quorum_size,
-            messages: HashMap::new(),
+            messages: BTreeMap::new(),
             values_by_round: HashMap::new(),
         }
     }
@@ -76,11 +76,17 @@ impl MessageContainer {
     }
 
     /// Count the number of messages we have received for this round
-    pub fn num_messages_for_round(&self, round: Round) -> usize {
-        self.messages
-            .get(&round)
-            .map(|msgs| msgs.len())
-            .unwrap_or(0)
+    pub fn first_partial_quorum_above_round(&self, round: Round, partial: usize) -> Option<Round> {
+        let mut operators_seen = HashSet::new();
+        for (&round, msgs) in self.messages.range((round + 1)..) {
+            for &operator in msgs.keys() {
+                operators_seen.insert(operator);
+            }
+            if partial >= self.quorum_size {
+                return Some(round);
+            }
+        }
+        None
     }
 
     /// If we have a quorum for the round, get all of the messages that correspond to that quorum

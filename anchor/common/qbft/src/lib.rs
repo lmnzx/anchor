@@ -816,14 +816,15 @@ where
         } else {
             // 2. If we receive f+1 round change messages, we need to send our own round-change
             //    message
-            let num_messages_for_round = self.round_change_container.num_messages_for_round(round);
-            if num_messages_for_round > self.config.get_f()
+            let round = self
+                .round_change_container
+                .first_partial_quorum_above_round(round, self.config.get_f() + 1);
+            if let Some(round) = round
                 && !(matches!(self.state, InstanceState::SentRoundChange))
             {
-                // Set the state so SendRoundChange so we include Round + 1 in message
                 self.state = InstanceState::SentRoundChange;
 
-                self.send_round_change(Hash256::default());
+                self.send_round_change(Hash256::default(), Some(round));
             }
         }
     }
@@ -864,7 +865,7 @@ where
         // Set the state so SendRoundChange so we include Round + 1 in message
         self.state = InstanceState::SentRoundChange;
 
-        self.send_round_change(Hash256::default());
+        self.send_round_change(Hash256::default(), None);
         self.start_round();
     }
 
@@ -922,6 +923,7 @@ where
         data_hash: D::Hash,
         round_change_justification: Vec<SignedSSVMessage>,
         prepare_justification: Vec<SignedSSVMessage>,
+        round_override: Option<Round>,
     ) -> UnsignedWrappedQbftMessage {
         let data = self.get_message_data(&msg_type, data_hash);
 
@@ -929,7 +931,7 @@ where
         let qbft_message = QbftMessage {
             qbft_message_type: msg_type,
             height: *self.instance_height as u64,
-            round: data.round,
+            round: round_override.map(|r| r.get() as u64).unwrap_or(data.round),
             identifier: (&self.identifier).into(),
             root: data.root,
             data_round: data.data_round,
@@ -1081,6 +1083,7 @@ where
             value_to_propose,
             round_change_justifications,
             prepare_justifications,
+            None,
         );
 
         self.message_sender.send(unsigned_msg);
@@ -1096,7 +1099,7 @@ where
 
         // Construct unsigned prepare
         let unsigned_msg =
-            self.new_unsigned_message(QbftMessageType::Prepare, data_hash, vec![], vec![]);
+            self.new_unsigned_message(QbftMessageType::Prepare, data_hash, vec![], vec![], None);
 
         self.message_sender.send(unsigned_msg);
     }
@@ -1105,13 +1108,13 @@ where
     fn send_commit(&mut self, data_hash: D::Hash) {
         // Construct unsigned commit
         let unsigned_msg =
-            self.new_unsigned_message(QbftMessageType::Commit, data_hash, vec![], vec![]);
+            self.new_unsigned_message(QbftMessageType::Commit, data_hash, vec![], vec![], None);
 
         self.message_sender.send(unsigned_msg);
     }
 
     // Send a new qbft round change message
-    fn send_round_change(&mut self, data_hash: D::Hash) {
+    fn send_round_change(&mut self, data_hash: D::Hash, round_override: Option<Round>) {
         // For Round Change messages
         // round_change_justification: list of prepare messages
         let round_change_justifications = self.get_round_change_justifications();
@@ -1123,6 +1126,7 @@ where
             data_hash,
             round_change_justifications,
             vec![],
+            round_override,
         );
 
         // forget that we accpeted a proposal
