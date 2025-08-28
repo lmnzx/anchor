@@ -264,6 +264,25 @@ where
             return None;
         }
 
+        // Check for future round
+        if wrapped_msg.qbft_message.round > self.current_round.into() {
+            match wrapped_msg.qbft_message.qbft_message_type {
+                QbftMessageType::Proposal | QbftMessageType::RoundChange => {
+                    // Proposals & Round Changes for future rounds are always allowed
+                }
+                QbftMessageType::Commit => {
+                    // Only decided messages (with quorum) are allowed from future rounds
+                    if wrapped_msg.signed_message.operator_ids().len() < self.config.quorum_size() {
+                        return None;
+                    }
+                }
+                _ => {
+                    // All other message types (including Prepare) for future rounds are not allowed
+                    return None;
+                }
+            }
+        }
+
         // Make sure we are at the correct instance height
         if wrapped_msg.qbft_message.height != *self.instance_height as u64 {
             warn!(
@@ -437,16 +456,25 @@ where
         wrapped_msg: WrappedQbftMessage,
     ) {
         // Make sure that we are actually waiting for a proposal
-        if !matches!(self.state, InstanceState::AwaitingProposal) {
+        if round == self.current_round && !matches!(self.state, InstanceState::AwaitingProposal) {
             debug!(from=?operator_id, ?self.state, "PROPOSE message while in invalid state");
+            return;
+        }
+
+        // Make sure this is from the leader
+        if !self.check_leader(&operator_id) {
+            warn!(from = ?operator_id, "PROPOSE message received from non-leader operator");
             return;
         }
 
         // If we are passed the first round, make sure that the justifications actually justify the
         // received proposal
-        if round > Round::default() && !self.validate_justifications(&wrapped_msg) {
-            warn!(from = ?operator_id, "Justification verifiction failed");
-            return;
+        if round > Round::default() {
+            // validate the justifications
+            if !self.validate_justifications(&wrapped_msg) {
+                warn!(from = ?operator_id, "Justification validation failed for proposal");
+                return;
+            }
         }
 
         // Fulldata is included in propose messages
@@ -470,10 +498,17 @@ where
             return;
         }
 
-        // Make sure we have not already accepted another proposal for this round.
-        if self.proposal_accepted_for_current_round {
+        // Only reject if we've already accepted a proposal for THIS round
+        // Allow proposals for future rounds even if we have a proposal for current round
+        if self.proposal_accepted_for_current_round && round == self.current_round {
             warn!(from = ?operator_id, "Proposal has already been accepted for this round");
             return;
+        }
+
+        // If this is a future round proposal, update our round to match
+        if round > self.current_round {
+            debug!(old_round = ?self.current_round, new_round = ?round, "Updating to future round from proposal");
+            self.current_round = round;
         }
 
         // Accept this proposal
@@ -611,6 +646,11 @@ where
         round: Round,
         wrapped_msg: WrappedQbftMessage,
     ) {
+        // If we are already done
+        if self.completed.is_some() {
+            return;
+        }
+
         // Check that we are in the correct state. We do not have to be in the PREPARE state right
         // now as this message may have been delayed
         if u8::from(self.state) >= u8::from(InstanceState::SentRoundChange) {
@@ -640,6 +680,14 @@ where
         // Make sure that we have accepted a proposal for this round
         if !self.proposal_accepted_for_current_round {
             debug!(from=?operator_id, ?self.state, "Have not accepted Proposal for current round yet");
+            return;
+        }
+
+        // Check that the prepare message is for the accepted proposal
+        if let Some(accepted_root) = self.proposal_root
+            && wrapped_msg.qbft_message.root != accepted_root
+        {
+            warn!(from=?operator_id, "PREPARE message for different root than accepted proposal");
             return;
         }
 
@@ -727,9 +775,10 @@ where
             // Make sure that the root of the data that we have come to a commit consensus on
             // matches the root of the proposal that we have accepted
             let proposal_root = match self.state {
+                InstanceState::Prepare { proposal_root } => proposal_root,
                 InstanceState::Commit { proposal_root } => proposal_root,
                 _ => {
-                    warn!(from=?operator_id, ?self.state, "Not in COMMIT state");
+                    warn!(from=?operator_id, ?self.state, "Not in PREPARE or COMMIT state");
                     return;
                 }
             };
