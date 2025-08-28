@@ -43,7 +43,9 @@ impl MessageContainer {
         }
 
         let mut msg = msg.clone();
-        // We no longer have need for full data in these messages
+        // We no longer have need for full data in these messages, as the hash is stored the QBFT
+        // state. The messages are here only used for quorum checking, and for justifications. For
+        // both the data is not needed.
         msg.signed_message.set_full_data(vec![]);
 
         self.values_by_round
