@@ -116,8 +116,12 @@ impl EventProcessor {
                     self.process_fee_recipient_updated(log, &tx)
                 }
 
-                SSVContract::ValidatorExited::SIGNATURE_HASH if live => {
-                    self.process_validator_exited(log)
+                SSVContract::ValidatorExited::SIGNATURE_HASH => {
+                    if live {
+                        self.process_validator_exited(log)
+                    } else {
+                        Ok(())
+                    }
                 }
                 _ => {
                     debug!(?topic0, "Unknown event signature, skipping");
