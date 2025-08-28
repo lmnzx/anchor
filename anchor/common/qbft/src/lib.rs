@@ -267,6 +267,16 @@ where
             return None;
         }
 
+        // Ensure the message is not for a round above the max round
+        if wrapped_msg.qbft_message.round > self.config.max_rounds() as u64 {
+            warn!(
+                message_round = wrapped_msg.qbft_message.round,
+                max_round = self.config.max_rounds(),
+                "Message received for a round above the max",
+            );
+            return None;
+        }
+
         // Check for future round
         if wrapped_msg.qbft_message.round > self.current_round.into() {
             match wrapped_msg.qbft_message.qbft_message_type {
