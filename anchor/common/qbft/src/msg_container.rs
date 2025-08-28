@@ -76,16 +76,28 @@ impl MessageContainer {
         round: Round,
         partial: usize,
     ) -> Option<Round> {
-        let mut operators_seen = HashSet::new();
-        for (&round, operators) in self.senders_by_round.range((round + 1)..).rev() {
-            for &operator in operators {
-                operators_seen.insert(operator);
+        // Collect all operators from rounds > round
+        let mut all_operators = HashSet::new();
+        let mut min_future_round = None;
+
+        for (&r, operators) in self.senders_by_round.range((round + 1)..) {
+            // Track minimum round
+            if min_future_round.is_none() {
+                min_future_round = Some(r);
             }
-            if operators_seen.len() >= partial {
-                return Some(round);
+
+            // Add all operators from this round
+            for &operator in operators {
+                all_operators.insert(operator);
             }
         }
-        None
+
+        // If we have partial quorum, return the minimum round
+        if all_operators.len() >= partial {
+            min_future_round
+        } else {
+            None
+        }
     }
 
     /// If we have a quorum for the round, get all of the messages that correspond to that quorum
