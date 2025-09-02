@@ -1,0 +1,65 @@
+name: local testnet
+
+on:
+  push:
+    branches:
+      - stable
+      - 'pr/*'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+
+jobs:
+  build-docker-image:
+    runs-on: ubuntu-latest # warp-docker-builder
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build Docker Image
+        # has to be Dockerfile.devnet as spec-minimal is necessary
+        run: |
+          docker build -f Dockerfile.devnet -t node/anchor:latest . 
+          docker save node/anchor:latest -o anchor-docker.tar
+
+      - name: Upload Docker Image Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-docker
+          path: anchor-docker.tar
+          retention-days: 1
+
+  run-local-testnet:
+    runs-on: ubuntu-latest # warp-ubuntu-latest-x64-16x
+    needs: build-docker-image
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: lmnzx/ssv-mini # change to dknopik/ssv-mini
+          ref: more-fixes # change to fixes
+
+      # could be a potential issue as apt.fury.io is not stable, switch to using binary if happens
+      - name: Install Kurtosis
+        run: |
+          echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" | sudo tee /etc/apt/sources.list.d/kurtosis.list
+          sudo apt update
+          sudo apt install -y kurtosis-cli
+          kurtosis analytics disable
+
+      - name: Download Docker Image Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: anchor-docker
+          path: .
+
+      - name: Load Docker Image
+        run: docker load -i anchor-docker.tar
+
+      - name: Start Local Testnet with Assertoor
+        timeout-minutes: 30
+        run: make run
+
+      - name: Await Assertoor test result
+        id: assertoor_test_result
+        uses: ethpandaops/assertoor-github-action@v1
+        with:
+          kurtosis_enclave_name: localnet
