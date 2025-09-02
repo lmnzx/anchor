@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-docker-image:
-    runs-on: ubuntu-latest # warp-docker-builder
+    runs-on: ubuntu-latest # warp-ubuntu-latest-x64-16x
     steps:
       - uses: actions/checkout@v5
 
@@ -58,8 +58,43 @@ jobs:
         timeout-minutes: 30
         run: make run
 
-      - name: Await Assertoor test result
+      - name: Await Assertoor Test Result
         id: assertoor_test_result
         uses: ethpandaops/assertoor-github-action@v1
         with:
           kurtosis_enclave_name: localnet
+
+      - name: Return Assertoor Test Result
+        shell: bash
+        run: |
+          test_result="${{ steps.assertoor_test_result.outputs.result }}"
+          test_status=$(
+          cat <<"EOF"
+          ${{ steps.assertoor_test_result.outputs.test_overview }}
+          EOF
+          )
+          failed_test_status=$(
+          cat <<"EOF"
+          ${{ steps.assertoor_test_result.outputs.failed_test_details }}
+          EOF
+          )
+          
+          echo "Test Result:  $test_result"
+          echo "$test_status"
+          if ! [ "$test_result" == "success" ]; then
+            echo "Failed Test Task Status:"
+            echo "$failed_test_status"
+            exit 1
+          fi
+
+      - name: Kurtosis Dump
+        if: always()
+        run: kurtosis enclave dump localnet anchor-localnet-test-logs
+
+      - name: Upload Logs Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-localnet-test-logs
+          path: anchor-localnet-test-logs/
+          retention-days: 3
