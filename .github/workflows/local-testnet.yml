@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: dknopik/ssv-mini
-          ref: fixes 
+          ref: c33c49418ff0722ef0722763bbf0849a6aba2849
 
       # could be a potential issue as apt.fury.io is not stable, switch to using binary if happens
       - name: Install Kurtosis
