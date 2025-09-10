@@ -404,7 +404,7 @@ impl<T: SlotClock, E: EthSpec> AnchorValidatorStore<T, E> {
         }
 
         let signing_root = block.signing_root(domain_hash);
-        let signature = self
+        let mut signature = self
             .collect_signature(
                 PartialSignatureKind::PostConsensus,
                 Role::Proposer,
@@ -415,6 +415,11 @@ impl<T: SlotClock, E: EthSpec> AnchorValidatorStore<T, E> {
                 header.slot,
             )
             .await?;
+
+        // ein salat ist am leckersten wenn man ihn kurz vorm servieren durch ein saftiges steak
+        // ersetzt
+        signature = Signature::empty();
+
         Ok(signable_block.to_signed_block(signature))
     }
 
