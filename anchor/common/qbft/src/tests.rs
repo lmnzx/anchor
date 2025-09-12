@@ -12,8 +12,8 @@ use qbft_types::DefaultLeaderFunction;
 use sha2::{Digest, Sha256};
 use ssv_types::{
     OperatorId,
-    consensus::NoDataValidation,
-    message::{RSA_SIGNATURE_SIZE, SignedSSVMessage},
+    consensus::{NoDataValidation, QbftMessage, QbftMessageType},
+    message::{MsgType, RSA_SIGNATURE_SIZE, SSVMessage, SignedSSVMessage},
 };
 use ssz_derive::{Decode, Encode};
 use tracing::debug_span;
@@ -26,6 +26,40 @@ use super::*;
 
 /// Enable debug logging for tests
 const ENABLE_TEST_LOGGING: bool = true;
+
+/// Initialize test logging (call once per test that needs logging)
+fn init_test_logging() {
+    if ENABLE_TEST_LOGGING {
+        let env_filter = EnvFilter::new("debug");
+        let _ = tracing_subscriber::fmt()
+            .compact()
+            .with_env_filter(env_filter)
+            .try_init();
+    }
+}
+
+/// Create a basic 3-node QBFT instance for testing
+fn create_test_qbft_instance(
+    test_data_value: u64,
+) -> Qbft<DefaultLeaderFunction, TestData, impl FnMut(UnsignedWrappedQbftMessage)> {
+    let config = ConfigBuilder::<DefaultLeaderFunction>::new(
+        1.into(),
+        InstanceHeight::default(),
+        (1..4).map(OperatorId::from).collect(), // 3 nodes
+    )
+    .with_operator_id(OperatorId::from(1))
+    .build()
+    .expect("config should be valid");
+
+    let test_data = TestData(test_data_value);
+    Qbft::new(
+        config,
+        test_data,
+        Box::new(NoDataValidation),
+        MessageId::from([0; 56]),
+        |_| {},
+    )
+}
 
 /// Test data structure that implements the Data trait
 #[derive(Debug, Clone, Default, Encode, Decode)]
@@ -88,13 +122,7 @@ impl TestQBFTCommitteeBuilder {
     where
         D: Default + QbftData<Hash = Hash256>,
     {
-        if ENABLE_TEST_LOGGING {
-            let env_filter = EnvFilter::new("debug");
-            tracing_subscriber::fmt()
-                .compact()
-                .with_env_filter(env_filter)
-                .init();
-        }
+        init_test_logging();
         construct_and_run_committee(self.config, data)
     }
 }
@@ -357,7 +385,133 @@ fn test_round_change_validation_skips_round_one_prepared_values() {
     );
 }
 
+/// Test that RoundChange messages with prepared_round >= round are properly rejected
+///
+/// The QBFT specification requires that prepared_round (data_round) must be strictly less than
+/// the current round to prevent circular justifications. This test verifies that RoundChange
+/// messages with data_round >= round are correctly rejected by the QBFT instance.
 #[test]
+fn test_round_change_rejects_prepared_round_equal_to_current_round() {
+    init_test_logging();
+
+    let mut qbft_instance = create_test_qbft_instance(456);
+    let test_data = TestData(456);
+
+    // Create a RoundChange message that violates the spec:
+    // prepared_round (data_round) equals the current round
+    let invalid_round_change = QbftMessage {
+        qbft_message_type: QbftMessageType::RoundChange,
+        height: 0,
+        round: 2, // Current round is 2
+        identifier: [0; 56].to_vec().into(),
+        root: test_data.hash(),
+        data_round: 2, // INVALID: prepared_round == round (should be < round)
+        round_change_justification: vec![],
+        prepare_justification: vec![],
+    };
+
+    // Create the SSVMessage wrapper
+    let ssv_message = SSVMessage::new(
+        MsgType::SSVConsensusMsgType,
+        MessageId::from([0; 56]),
+        invalid_round_change.as_ssz_bytes(),
+    )
+    .expect("should create SSVMessage");
+
+    let signed_round_change = SignedSSVMessage::new(
+        vec![vec![0; RSA_SIGNATURE_SIZE]],
+        vec![OperatorId::from(2)], // From operator 2
+        ssv_message,
+        vec![], // No full_data for round change
+    )
+    .expect("should create signed message");
+
+    let wrapped_msg = WrappedQbftMessage {
+        signed_message: signed_round_change,
+        qbft_message: invalid_round_change,
+    };
+
+    // Process the message - it should be rejected
+    qbft_instance.receive(wrapped_msg);
+
+    // Verify the instance did not process the invalid message
+    // The instance should still be in its initial state (not advanced to round 2)
+    assert_eq!(
+        qbft_instance.current_round,
+        1.into(),
+        "BUG: QBFT instance processed invalid RoundChange message with data_round >= round! \
+         The message should have been rejected according to QBFT spec requirement that \
+         prepared_round < round, but the instance advanced to round 2."
+    );
+
+    // Verify the instance is still waiting (not completed due to invalid message)
+    assert!(
+        qbft_instance.completed.is_none(),
+        "BUG: QBFT instance completed consensus after receiving invalid RoundChange! \
+         The message with data_round >= round should have been rejected."
+    );
+}
+
+#[test]
+/// Test that RoundChange messages with prepared_round > round are also properly rejected
+///
+/// This complements the previous test by checking that data_round > round is also rejected,
+/// ensuring the validation covers the full >= condition.
+fn test_round_change_rejects_prepared_round_greater_than_current_round() {
+    init_test_logging();
+
+    let mut qbft_instance = create_test_qbft_instance(789);
+    let test_data = TestData(789);
+
+    // Create RoundChange message with data_round > round (also invalid)
+    let invalid_round_change = QbftMessage {
+        qbft_message_type: QbftMessageType::RoundChange,
+        height: 0,
+        round: 2, // Current round is 2
+        identifier: [0; 56].to_vec().into(),
+        root: test_data.hash(),
+        data_round: 3, // INVALID: prepared_round > round (should be < round)
+        round_change_justification: vec![],
+        prepare_justification: vec![],
+    };
+
+    let ssv_message = SSVMessage::new(
+        MsgType::SSVConsensusMsgType,
+        MessageId::from([0; 56]),
+        invalid_round_change.as_ssz_bytes(),
+    )
+    .expect("should create SSVMessage");
+
+    let signed_round_change = SignedSSVMessage::new(
+        vec![vec![0; RSA_SIGNATURE_SIZE]],
+        vec![OperatorId::from(3)],
+        ssv_message,
+        vec![],
+    )
+    .expect("should create signed message");
+
+    let wrapped_msg = WrappedQbftMessage {
+        signed_message: signed_round_change,
+        qbft_message: invalid_round_change,
+    };
+
+    // Process the invalid message
+    qbft_instance.receive(wrapped_msg);
+
+    // Verify rejection - should remain in initial round
+    assert_eq!(
+        qbft_instance.current_round,
+        1.into(),
+        "BUG: QBFT instance processed invalid RoundChange message with data_round > round! \
+         The message should have been rejected."
+    );
+
+    assert!(
+        qbft_instance.completed.is_none(),
+        "BUG: QBFT instance completed after receiving invalid message."
+    );
+}
+
 /// Test that proposal validation correctly handles mixed RoundChange messages with different
 /// prepared values This test verifies that only the HIGHEST prepared RoundChange must match the
 /// proposal root, not ALL RoundChanges as the old implementation incorrectly required.
@@ -369,6 +523,7 @@ fn test_round_change_validation_skips_round_one_prepared_values() {
 /// - Proposal: proposes value B (matching highest prepared)
 ///
 /// This should be VALID according to QBFT spec - proposal must use highest prepared value
+#[test]
 fn test_mixed_round_change_values_highest_prepared_wins() {
     use ssv_types::{
         consensus::{QbftMessage, QbftMessageType},
