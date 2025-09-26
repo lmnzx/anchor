@@ -2728,6 +2728,7 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "anchor_validator_store",
+ "base64 0.22.1",
  "beacon_node_fallback",
  "database",
  "duties_tracker",
@@ -2745,9 +2746,11 @@ dependencies = [
  "ssv_network_config",
  "ssv_types",
  "task_executor",
+ "tempfile",
  "tokio",
  "tower",
  "tracing",
+ "tracing-subscriber",
  "types",
 ]
 
