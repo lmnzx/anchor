@@ -777,6 +777,7 @@ dependencies = [
  "clap",
  "client",
  "dirs",
+ "ethereum_hashing",
  "futures",
  "global_config",
  "keygen",
@@ -792,6 +793,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "types",
+ "version",
 ]
 
 [[package]]
@@ -1826,7 +1828,6 @@ dependencies = [
  "duties_tracker",
  "eth",
  "eth2",
- "ethereum_hashing",
  "fdlimit",
  "global_config",
  "http_api",
