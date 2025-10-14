@@ -48,12 +48,6 @@ jobs:
                     echo "⚠️ User is not a member of sigp organization. Skipping."
                     exit 1
                   fi
-            - name: Checkout repository
-              if: steps.check.outputs.is_member == 'true' && steps.check.outputs.claude_mentioned == 'true'
-              uses: actions/checkout@v4
-              with: 
-                  ref: ${{ github.event.pull_request.head.sha || github.sha }}
-                  fetch-depth: 1 
 
             - name: Generate GitHub App token
               if: steps.check.outputs.is_member == 'true' && steps.check.outputs.claude_mentioned == 'true'
