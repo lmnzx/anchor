@@ -73,4 +73,5 @@ jobs:
               with:
                   github_token: ${{ steps.app-token.outputs.token }}
                   use_bedrock: "true"
+                  track_progress: "true"
                   claude_args: '--model us.anthropic.claude-sonnet-4-5-20250929-v1:0 --max-turns 10'
