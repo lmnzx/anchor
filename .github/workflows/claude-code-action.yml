@@ -49,6 +49,14 @@ jobs:
                     exit 1
                   fi
 
+            - name: Checkout PR
+              if: steps.check.outputs.is_member == 'true' && steps.check.outputs.claude_mentioned == 'true'
+              uses: actions/checkout@v4
+              with:
+                  repository: ${{ github.event.pull_request.head.repo.full_name }}
+                  ref: ${{ github.event.pull_request.head.ref }}
+                  fetch-depth: 0  
+
             - name: Generate GitHub App token
               if: steps.check.outputs.is_member == 'true' && steps.check.outputs.claude_mentioned == 'true'
               id: app-token
