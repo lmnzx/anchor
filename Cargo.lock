@@ -770,13 +770,14 @@ dependencies = [
 
 [[package]]
 name = "anchor"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "async-channel 1.9.0",
  "bls",
  "clap",
  "client",
  "dirs",
+ "ethereum_hashing",
  "futures",
  "global_config",
  "keygen",
@@ -792,6 +793,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "types",
+ "version",
 ]
 
 [[package]]
@@ -802,6 +804,7 @@ dependencies = [
  "database",
  "eth2",
  "ethereum_ssz",
+ "futures",
  "hex",
  "lru 0.16.1",
  "metrics",
@@ -1815,7 +1818,7 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
 name = "client"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "anchor_validator_store",
  "beacon_node_fallback",
@@ -1825,7 +1828,6 @@ dependencies = [
  "duties_tracker",
  "eth",
  "eth2",
- "ethereum_hashing",
  "fdlimit",
  "global_config",
  "http_api",
@@ -1836,6 +1838,7 @@ dependencies = [
  "message_receiver",
  "message_sender",
  "message_validator",
+ "metrics",
  "multiaddr",
  "network",
  "network_utils",
@@ -4413,7 +4416,7 @@ dependencies = [
 
 [[package]]
 name = "keygen"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -4430,7 +4433,7 @@ dependencies = [
 
 [[package]]
 name = "keysplit"
-version = "1.0.0-rc.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "alloy",
  "base64 0.22.1",
@@ -4444,12 +4447,15 @@ dependencies = [
  "hex",
  "openssl",
  "operator_key",
+ "rpassword",
  "serde",
  "serde_json",
  "ssv_types",
+ "tempfile",
  "tokio",
  "tracing",
  "types",
+ "zeroize",
 ]
 
 [[package]]
@@ -4593,7 +4599,7 @@ dependencies = [
 [[package]]
 name = "libp2p-gossipsub"
 version = "0.50.0"
-source = "git+https://github.com/sigp/rust-libp2p.git?rev=2a726cd#2a726cdbec1f055854755dc03a632d804e268543"
+source = "git+https://github.com/sigp/rust-libp2p.git?rev=fabf27f#fabf27f2021ba582d9b0d1c15ca47babef453497"
 dependencies = [
  "async-channel 2.5.0",
  "asynchronous-codec",
@@ -4605,7 +4611,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "getrandom 0.2.16",
- "hashlink 0.9.1",
+ "hashlink 0.10.0",
  "hex_fmt",
  "libp2p-core",
  "libp2p-identity",
@@ -4881,7 +4887,7 @@ dependencies = [
  "rcgen",
  "ring",
  "rustls 0.23.32",
- "rustls-webpki 0.103.6",
+ "rustls-webpki 0.103.7",
  "thiserror 2.0.17",
  "x509-parser",
  "yasna",
@@ -4914,7 +4920,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "yamux 0.12.1",
- "yamux 0.13.6",
+ "yamux 0.13.7",
 ]
 
 [[package]]
@@ -4980,6 +4986,7 @@ dependencies = [
  "clap",
  "logroller",
  "metrics",
+ "nu-ansi-term",
  "tracing",
  "tracing-appender",
  "tracing-core",
@@ -5498,6 +5505,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "twox-hash",
  "types",
  "version",
 ]
@@ -6967,7 +6975,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.6",
+ "rustls-webpki 0.103.7",
  "subtle",
  "zeroize",
 ]
@@ -7003,9 +7011,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.6"
+version = "0.103.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8572f3c2cb9934231157b45499fc41e1f58c589fdfb81a844ba873265e80f8eb"
+checksum = "e10b3f4191e8a80e6b43eebabfac91e5dcecebb27a71f04e820c47ec41d314bf"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -8369,10 +8377,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "typenum"
-version = "1.18.0"
+name = "twox-hash"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
+checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
+dependencies = [
+ "rand 0.9.2",
+]
+
+[[package]]
+name = "typenum"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "types"
@@ -9450,9 +9467,9 @@ dependencies = [
 
 [[package]]
 name = "yamux"
-version = "0.13.6"
+version = "0.13.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b2dd50a6d6115feb3e5d7d0efd45e8ca364b6c83722c1e9c602f5764e0e9597"
+checksum = "6927cfe0edfae4b26a369df6bad49cd0ef088c0ec48f4045b2084bcaedc10246"
 dependencies = [
  "futures",
  "log",
