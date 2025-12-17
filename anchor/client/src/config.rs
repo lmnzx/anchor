@@ -199,6 +199,9 @@ pub fn from_cli(cli_args: &Node, global_config: GlobalConfig) -> Result<Config, 
 
     config.network.subscribe_all_subnets = cli_args.subscribe_all_subnets;
 
+    // If the flag was set (true), it means we disable upnp so upnp_enabled should be false
+    config.network.upnp_enabled = !cli_args.disable_upnp;
+
     config.network.target_peers = cli_args.target_peers;
 
     // Network related - set peer scoring configuration
