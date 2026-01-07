@@ -46,3 +46,6 @@ nodes:
     count: 0
   anchor:
     count: 4
+
+images:
+  anchor: node/anchor:latest
