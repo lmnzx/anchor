@@ -34,8 +34,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          repository: dknopik/ssv-mini
-          ref: c33c49418ff0722ef0722763bbf0849a6aba2849
+          repository: ssvlabs/ssv-mini
+          ref: e518eeb4d6f56ba3a90a483bc30adfaf58ce5381
+          path: ssv-mini
+
+      - uses: actions/checkout@v5
+        with:
+          path: anchor
 
       - name: Install Kurtosis
         run: |
@@ -58,7 +63,7 @@ jobs:
 
       - name: Start Local Testnet with Assertoor
         timeout-minutes: 30
-        run: make run
+        run: kurtosis run --verbosity DETAILED --enclave localnet ssv-mini --args-file anchor/.github/custom/local-testnet/params.yaml
 
       - name: Await Assertoor Test Result
         id: assertoor_test_result

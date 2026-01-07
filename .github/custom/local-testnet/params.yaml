@@ -1,0 +1,48 @@
+# This config is used in the local-testnet.yml workflow and is a ssv-mini kurtosis config
+network:
+  participants:
+    - el_type: geth
+      cl_type: lighthouse
+      validator_count: 32
+      count: 1
+    - el_type: nethermind
+      cl_type: lighthouse
+      validator_count: 32
+      count: 1
+
+  additional_services:
+    - dora # Helps to see validators are working
+    - assertoor
+
+  assertoor_params:
+    run_stability_check: true
+    run_block_proposal_check: true
+    run_transaction_test: true
+    run_blob_transaction_test: true
+
+  global_log_level: debug
+
+  snooper_enabled: false
+
+  network_params:
+    # this is 'kurtosis' network ID, which is a default network. With this configuration CL /spec endpoint will return CONFIG_NAME=testnet
+    network_id: "3151908"
+    deneb_fork_epoch: 0
+    electra_fork_epoch: 0
+    fulu_fork_epoch: 0
+    seconds_per_slot: 6
+    # 74 = 32 validators * 2(number of el/cl nodes) + 10 (running on SSV/Anchor nodes)
+    # aligns with validator_count configuration under participants section
+    preregistered_validator_count: 74
+    # NOTE: changes the number of slots in the epoch and potentially some other network settings.
+    # docs: https://github.com/ethpandaops/ethereum-package/blob/main/README.md#configuration
+    preset: minimal
+
+monitor:
+  enabled: false
+
+nodes:
+  ssv:
+    count: 0
+  anchor:
+    count: 4
