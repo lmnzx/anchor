@@ -2,64 +2,19 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     num::NonZeroU16,
     path::PathBuf,
-    sync::LazyLock,
 };
 
+use beacon_node_fallback::ApiTopic;
 use clap::{
     Parser,
-    builder::{ArgAction, ArgPredicate, styling::*},
+    builder::{ArgAction, ArgPredicate},
 };
-use ethereum_hashing::have_sha_extensions;
 use logging::FileLoggingFlags;
-use version::VERSION;
-
-pub static SHORT_VERSION: LazyLock<String> = LazyLock::new(|| VERSION.replace("Anchor/", ""));
-pub static LONG_VERSION: LazyLock<String> = LazyLock::new(|| {
-    format!(
-        "{}\n\
-         SHA256 hardware acceleration: {}\n\
-         Allocator: {}\n\
-         Profile: {}",
-        SHORT_VERSION.as_str(),
-        have_sha_extensions(),
-        allocator_name(),
-        build_profile_name(),
-    )
-});
 
 pub const FLAG_HEADER: &str = "Flags";
 
-fn allocator_name() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "system"
-    } else {
-        "jemalloc"
-    }
-}
-
-fn build_profile_name() -> &'static str {
-    // Nice hack from https://stackoverflow.com/questions/73595435/how-to-get-profile-from-cargo-toml-in-build-rs-or-at-runtime
-    // The profile name is always the 3rd last part of the path (with 1 based indexing).
-    // e.g. /code/core/target/cli/build/my-build-info-9f91ba6f99d7a061/out
-    env!("OUT_DIR")
-        .split(std::path::MAIN_SEPARATOR)
-        .nth_back(3)
-        .unwrap_or("unknown")
-}
-
 #[derive(Parser, Clone, Debug)]
-#[clap(
-    name = "ssv",
-    about = "SSV Validator client. Maintained by Sigma Prime.",
-    author = "Sigma Prime <contact@sigmaprime.io>",
-    long_version = LONG_VERSION.as_str(),
-    version = SHORT_VERSION.as_str(),
-    styles = get_color_style(),
-    disable_help_flag = true,
-    next_line_help = true,
-    term_width = 80,
-    display_order = 0,
-)]
+#[clap(name = "node", about = "Start Anchor node")]
 pub struct Node {
     #[clap(
         long,
@@ -128,10 +83,42 @@ pub struct Node {
 
     #[clap(
         long,
+        value_name = "API_TOPICS",
+        value_delimiter = ',',
+        help = "Comma-separated list of beacon API topics to broadcast to all beacon nodes. \
+                Possible values are: none, attestations, blocks, subscriptions, sync-committee. \
+                Default (when flag is omitted) is to broadcast subscriptions only.",
+        display_order = 0
+    )]
+    pub broadcast: Option<Vec<ApiTopic>>,
+
+    #[clap(
+        long,
+        value_name = "SYNC_TOLERANCES",
+        value_delimiter = ',',
+        default_value = "8,8,48",
+        help = "A comma-separated list of 3 values which sets the size of each sync distance range when \
+                determining the health of each connected beacon node. \
+                The first value determines the `Synced` range. If a connected beacon node is synced to within \
+                this number of slots it is considered 'Synced'. \
+                The second value determines the `Small` sync distance range. This range starts immediately after \
+                the `Synced` range. \
+                The third value determines the `Medium` sync distance range. This range starts immediately after \
+                the `Small` range. \
+                Any sync distance larger than the `Medium` range is considered `Large`. \
+                For example, a value of '8,8,48' would mean: \
+                Synced: 0..=8, Small: 9..=16, Medium: 17..=64, Large: 65..",
+        display_order = 0,
+        help_heading = FLAG_HEADER
+    )]
+    pub beacon_nodes_sync_tolerances: Vec<u64>,
+
+    #[clap(
+        long,
         value_name = "CERTIFICATE-FILES",
         value_delimiter = ',',
         help = "Comma-separated paths to custom TLS certificates to use when connecting \
-                to an exection node. These certificates must be in PEM format and are used \
+                to an execution node. These certificates must be in PEM format and are used \
                 in addition to the OS trust store. Commas must only be used as a \
                 delimiter, and must not be part of the certificate path",
         display_order = 0
@@ -160,7 +147,7 @@ pub struct Node {
                 flag is used, it additionally requires the explicit use of the \
                 `--unencrypted-http-transport` flag to ensure the user is aware of the \
                 risks involved. For access via the Internet, users should apply \
-                transport-layer security like a HTTPS reverse-proxy or SSH tunnelling.",
+                transport-layer security like a HTTPS reverse-proxy or SSH tunneling.",
         display_order = 0,
         requires = "http",
         requires = "unencrypted_http_transport"
@@ -281,6 +268,22 @@ pub struct Node {
     )]
     pub use_zero_ports: bool,
 
+    #[clap(
+        long,
+        help = "Disables UPnP support. Setting this will prevent Anchor \
+            from attempting to automatically establish external port mappings.",
+        default_value = "false"
+    )]
+    pub disable_upnp: bool,
+
+    #[clap(
+        long,
+        help = "Specify the target number of connected peers. If omitted, the target is calculated \
+                dynamically based on active subnets (60 base + 3 per subnet, capped at 150)",
+        action = ArgAction::Set,
+    )]
+    pub target_peers: Option<usize>,
+
     // Prometheus metrics HTTP server related arguments
     #[clap(
         long,
@@ -322,16 +325,6 @@ pub struct Node {
     pub enable_high_validator_count_metrics: bool,
     // TODO: Metrics CORS Origin
     // https://github.com/sigp/anchor/issues/249
-    #[clap(
-        long,
-        global = true,
-        help = "Prints help information",
-        action = clap::ArgAction::HelpLong,
-        display_order = 0,
-        help_heading = FLAG_HEADER
-    )]
-    help: Option<bool>,
-
     #[clap(
         long,
         global = true,
@@ -427,6 +420,16 @@ pub struct Node {
 
     #[clap(
         long,
+        global = true,
+        help = "Discovery can automatically discover external addresses if the node has correctly set up port forwards.\
+                It will automatically update this nodes ENR with values it finds. This can have undesired effects for complicated networks.\
+                Setting this flag will disable discovery from updating the ENR from CLI set values.",
+        display_order = 0
+    )]
+    pub disable_enr_auto_update: bool,
+
+    #[clap(
+        long,
         help = "Subscribe to all subnets, regardless of committee membership.",
         display_order = 0,
         help_heading = FLAG_HEADER,
@@ -471,7 +474,6 @@ pub struct Node {
         long,
         value_name = "INTEGER",
         default_value_t = 36_000_000,
-        requires = "builder_proposals",
         help = "The gas limit to be used in all builder proposals for all validators managed. \
                 Note this will not necessarily be used if the gas limit \
                 set here moves too far from the previous block's gas limit.",
@@ -482,11 +484,10 @@ pub struct Node {
     #[clap(
         long,
         alias = "private-tx-proposals",
-        help = "If this flag is set, Anchor will query the Beacon Node for only block \
-                headers during proposals and will sign over headers. Useful for outsourcing \
-                execution payload construction during proposals.",
+        help = "Deprecated and ignored. Validator registrations are now always created.",
         display_order = 0,
-        help_heading = FLAG_HEADER
+        help_heading = FLAG_HEADER,
+        hide = true
     )]
     pub builder_proposals: bool,
 
@@ -530,14 +531,44 @@ pub struct Node {
     #[clap(long, help = "Disables gossipsub topic scoring.", hide = true)]
     pub disable_gossipsub_topic_scoring: bool,
 
+    // Operator Doppelgänger Protection
+    #[clap(
+        long,
+        help = "Enable operator doppelgänger protection. When enabled, the node blocks all \
+                outgoing messages and monitors the network for messages signed with its operator ID \
+                that reference slots after startup. Shuts down if a twin operator is detected \
+                to prevent QBFT protocol violations.",
+        display_order = 0,
+        default_value_t = false,
+        help_heading = FLAG_HEADER,
+        action = ArgAction::Set
+    )]
+    pub operator_dg: bool,
+
+    #[clap(
+        long,
+        value_name = "EPOCHS",
+        help = "Number of epochs to monitor for twin operators using slot-based detection. \
+                During monitoring, outgoing messages remain blocked and the node checks incoming \
+                messages for slots after startup to detect duplicate operator instances.",
+        display_order = 0,
+        default_value_t = 2,
+        requires = "operator_dg"
+    )]
+    pub operator_dg_wait_epochs: u64,
+
+    // Majority fork protection
+    #[clap(
+        long,
+        help = "Enable strict majority fork protection. When enabled, the node will not \
+                participate in attestation production if the checkpoint roots mismatch. \
+                Using this flag might reduce validator performance if cluster operators have \
+                struggling nodes, but can help to avoid finalization of a faulty majority fork.",
+        display_order = 0,
+        help_heading = FLAG_HEADER,
+    )]
+    pub strict_mfp: bool,
+
     #[clap(flatten)]
     pub logging_flags: FileLoggingFlags,
-}
-
-pub fn get_color_style() -> Styles {
-    Styles::styled()
-        .header(AnsiColor::Yellow.on_default())
-        .usage(AnsiColor::Green.on_default())
-        .literal(AnsiColor::Green.on_default())
-        .placeholder(AnsiColor::Green.on_default())
 }

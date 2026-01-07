@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod config;
 mod key;
+mod metrics;
 mod notifier;
 
 use std::{
@@ -12,9 +13,12 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use anchor_validator_store::{AnchorValidatorStore, metadata_service::MetadataService};
+use anchor_validator_store::{
+    AnchorValidatorStore, metadata_service::MetadataService,
+    registration_service::RegistrationService,
+};
 use beacon_node_fallback::{
-    ApiTopic, BeaconNodeFallback, CandidateBeaconNode, start_fallback_updater_service,
+    BeaconNodeFallback, CandidateBeaconNode, start_fallback_updater_service,
 };
 pub use cli::Node;
 use config::Config;
@@ -32,6 +36,7 @@ use message_sender::{MessageSender, NetworkMessageSender, impostor::ImpostorMess
 use message_validator::Validator;
 use network::Network;
 use openssl::rsa::Rsa;
+use operator_doppelganger::OperatorDoppelgangerService;
 use parking_lot::RwLock;
 use qbft_manager::QbftManager;
 use sensitive_url::SensitiveUrl;
@@ -77,8 +82,6 @@ const HTTP_GET_DEPOSIT_SNAPSHOT_QUOTIENT: u32 = 4;
 const HTTP_GET_VALIDATOR_BLOCK_TIMEOUT_QUOTIENT: u32 = 4;
 const HTTP_DEFAULT_TIMEOUT_QUOTIENT: u32 = 4;
 
-const MAINNET_GENESIS_FORK_VERSION: [u8; 4] = [0, 0, 0, 0];
-
 pub struct Client {}
 
 impl Client {
@@ -102,10 +105,11 @@ impl Client {
         };
 
         info!(
-            beacon_nodes = format!("{:?}", &config.beacon_nodes),
-            execution_nodes = format!("{:?}", &config.execution_nodes),
-            execution_nodes_websocket = format!("{:?}", &config.execution_nodes_websocket),
-            data_dir = format!("{:?}", config.global_config.data_dir),
+            beacon_nodes = ?config.beacon_nodes,
+            execution_nodes = ?config.execution_nodes,
+            execution_nodes_websocket = ?config.execution_nodes_websocket,
+            data_dir = %config.global_config.data_dir,
+            version = version::VERSION,
             "Starting the Anchor client"
         );
 
@@ -116,12 +120,6 @@ impl Client {
                 .eth2_network
                 .chain_spec::<E>()?,
         );
-
-        if spec.genesis_fork_version == MAINNET_GENESIS_FORK_VERSION {
-            return Err(
-                "Mainnet is not supported. Please use a testnet configuration.".to_string(),
-            );
-        }
 
         let key = read_or_generate_private_key(
             &config.global_config.data_dir,
@@ -160,6 +158,10 @@ impl Client {
             let metrics_future = http_metrics::serve(listener, shared_state.clone(), exit);
 
             executor.spawn_without_exit(metrics_future, "metrics-http");
+
+            metrics::expose_anchor_version();
+            metrics::expose_process_start_time();
+
             Some(shared_state)
         } else {
             info!("HTTP metrics server is disabled");
@@ -313,22 +315,20 @@ impl Client {
         // Initialize the number of connected, synced beacon nodes to 0.
         set_gauge(&validator_metrics::ETH2_FALLBACK_CONNECTED, 0);
         set_gauge(&validator_metrics::SYNCED_BEACON_NODES_COUNT, 0);
-        // Initialize the number of connected, avaliable beacon nodes to 0.
+        // Initialize the number of connected, available beacon nodes to 0.
         set_gauge(&validator_metrics::AVAILABLE_BEACON_NODES_COUNT, 0);
 
-        // TODO: make beacon_node_fallback::Config and broadcast_topics configurable
-        // https://github.com/sigp/anchor/issues/248
         let mut beacon_nodes: BeaconNodeFallback<_> = BeaconNodeFallback::new(
             candidates,
-            beacon_node_fallback::Config::default(),
-            vec![ApiTopic::Subscriptions],
+            config.beacon_node_fallback,
+            config.broadcast_topics.clone(),
             spec.clone(),
         );
 
         let mut proposer_nodes: BeaconNodeFallback<_> = BeaconNodeFallback::new(
             proposer_candidates,
-            beacon_node_fallback::Config::default(),
-            vec![ApiTopic::Subscriptions],
+            config.beacon_node_fallback,
+            config.broadcast_topics.clone(),
             spec.clone(),
         );
 
@@ -393,6 +393,10 @@ impl Client {
             "syncer",
         );
 
+        // Create operator ID wrapper that watches the database for our operator ID.
+        // Follows the common pattern: pass OwnOperatorId to components, they call .get() only when
+        // needed. This allows initialization before sync completes (which populates the ID from
+        // chain).
         let operator_id = OwnOperatorId::new(database.watch());
 
         // Network sender/receiver
@@ -418,15 +422,34 @@ impl Client {
             &executor,
         );
 
+        // Create operator doppelgänger protection if enabled (will be started after sync)
+        let doppelganger_service = if config.operator_dg && config.impostor.is_none() {
+            // Get current slot for slot-based detection baseline
+            let startup_slot = slot_clock.now().ok_or_else(|| {
+                "Failed to get current slot for doppelgänger protection".to_string()
+            })?;
+
+            Some(Arc::new(OperatorDoppelgangerService::new(
+                operator_id.clone(),
+                startup_slot,
+                E::slots_per_epoch(),
+                Duration::from_secs(spec.seconds_per_slot),
+            )))
+        } else {
+            None
+        };
+
         let message_sender: Arc<dyn MessageSender> = if config.impostor.is_none() {
             Arc::new(NetworkMessageSender::new(
-                processor_senders.clone(),
-                network_tx.clone(),
-                key.clone(),
-                operator_id.clone(),
-                Some(message_validator.clone()),
-                SUBNET_COUNT,
-                is_synced.clone(),
+                message_sender::NetworkMessageSenderConfig {
+                    processor: processor_senders.clone(),
+                    network_tx: network_tx.clone(),
+                    private_key: key.clone(),
+                    operator_id: operator_id.clone(),
+                    validator: Some(message_validator.clone()),
+                    subnet_count: SUBNET_COUNT,
+                    is_synced: is_synced.clone(),
+                },
             )?)
         } else {
             Arc::new(ImpostorMessageSender::new(network_tx.clone(), SUBNET_COUNT))
@@ -473,6 +496,7 @@ impl Client {
             is_synced.clone(),
             outcome_tx,
             message_validator,
+            doppelganger_service.clone(),
         );
 
         // Start the p2p network
@@ -507,9 +531,9 @@ impl Client {
             genesis_validators_root,
             config.impostor.is_none().then_some(key),
             config.gas_limit,
-            config.builder_proposals,
             config.builder_boost_factor,
             config.prefer_builder_proposals,
+            config.strict_mfp,
             is_synced.clone(),
         );
 
@@ -559,6 +583,7 @@ impl Client {
             duties_service.clone(),
             database.watch(),
             is_synced.clone(),
+            doppelganger_service.clone(),
             executor.clone(),
             &spec,
         );
@@ -571,6 +596,15 @@ impl Client {
             .await
             .map_err(|_| "Sync watch channel closed")?;
         info!("Sync complete, starting services...");
+
+        // Block client startup during operator doppelgänger monitoring period (now that sync
+        // is complete and operator ID available). During this period, incoming messages are
+        // checked for twins and duties services won't start until monitoring completes.
+        if let Some(service) = &doppelganger_service {
+            service
+                .monitor_blocking(config.operator_dg_wait_epochs)
+                .await?;
+        }
 
         let mut block_service_builder = BlockServiceBuilder::new()
             .slot_clock(slot_clock.clone())
@@ -602,6 +636,13 @@ impl Client {
             .executor(executor.clone())
             .validator_registration_batch_size(500)
             .build()?;
+
+        let registration_service = RegistrationService::new(
+            validator_store.clone(),
+            slot_clock.clone(),
+            beacon_nodes.clone(),
+            executor.clone(),
+        );
 
         let sync_committee_service = SyncCommitteeService::new(
             duties_service.clone(),
@@ -645,8 +686,12 @@ impl Client {
             .map_err(|e| format!("Unable to start metadata service: {e}"))?;
 
         preparation_service
-            .start_update_service(&spec)
+            .start_proposer_prepare_service(&spec)
             .map_err(|e| format!("Unable to start preparation service: {e}"))?;
+
+        registration_service
+            .start_validator_registration_service(&spec)
+            .map_err(|e| format!("Unable to start validator registration service: {e}"))?;
 
         http_api_shared_state.write().database_state = Some(database.watch());
 

@@ -12,11 +12,10 @@ use alloy::{
     sol_types::SolEvent,
     transports::{RpcError, TransportErrorKind},
 };
-use database::NetworkDatabase;
+use database::{NetworkDatabase, SlashingProtection};
 use futures::{FutureExt, StreamExt, stream::FuturesOrdered};
 use reqwest::Url;
 use sensitive_url::SensitiveUrl;
-use slashing_protection::SlashingDatabase;
 use ssv_network_config::SsvNetworkConfig;
 use tokio::{select, sync::watch, task::spawn_blocking, time::Duration};
 use tracing::{debug, error, info, instrument, trace, warn};
@@ -114,13 +113,13 @@ pub struct SsvEventSyncer {
 }
 
 impl SsvEventSyncer {
-    #[instrument(skip(db, config), level = "debug")]
+    #[instrument(skip(db, config, slashing_protection), level = "debug")]
     /// Create a new SsvEventSyncer to sync all of the events from the chain
     pub async fn new(
         db: Arc<NetworkDatabase>,
         index_sync_tx: index_sync::Tx,
         exit_tx: ExitTx,
-        slashing_protection: Arc<SlashingDatabase>,
+        slashing_protection: Arc<dyn SlashingProtection>,
         config: Config,
     ) -> Result<Self, ExecutionError> {
         info!("Creating new SSV Event Syncer");
@@ -177,7 +176,7 @@ impl SsvEventSyncer {
         let event_processor = EventProcessor::new(db, Mode::KeySplit);
 
         // This does not perform a live sync, so we just want to mock websocket fields. This helps
-        // so that we dont have to switch the ws fields to Option and clutter up the rest of the
+        // so that we don't have to switch the ws fields to Option and clutter up the rest of the
         // application unnecessarily
         let ws_url = String::from("");
         let ws_client = ProviderBuilder::default().connect_http(http_url);
@@ -264,7 +263,8 @@ impl SsvEventSyncer {
         let mut retry_count = 0;
         let mut current_backoff_ms = INITIAL_BACKOFF_MS;
 
-        while (self.rpc_client.get_block_number().await).is_err() {
+        while let Err(error) = self.rpc_client.get_block_number().await {
+            warn!(?error, "RPC Error");
             self.apply_backoff(&mut retry_count, &mut current_backoff_ms)
                 .await;
         }
@@ -284,7 +284,7 @@ impl SsvEventSyncer {
                 self.ws_client = ws_client;
                 break;
             }
-            // unsuccessfull, backoff
+            // unsuccessful, backoff
             self.apply_backoff(&mut retry_count, &mut current_backoff_ms)
                 .await;
         }
@@ -306,7 +306,7 @@ impl SsvEventSyncer {
         warn!(
             retry_count,
             backoff_ms = current_backoff_ms,
-            "Conneciton error, backing off before retry"
+            "Connection error, backing off before retry"
         );
         *retry_count += 1;
 
@@ -401,8 +401,8 @@ impl SsvEventSyncer {
 
             // Here, we have a start..end block that we need to sync the logs from. This range gets
             // broken up into individual ranges of BATCH_SIZE where the logs are fetches from. The
-            // individual ranges are further broken up into a set of batches that are sequentually
-            // processes. This makes it so we dont have a ton of logs that all have to be processed
+            // individual ranges are further broken up into a set of batches that are sequentially
+            // processes. This makes it so we don't have a ton of logs that all have to be processed
             // in one pass
 
             // Chunk the start and end block range into a set of ranges of size BATCH_SIZE
@@ -510,6 +510,17 @@ impl SsvEventSyncer {
             start_block = end_block + 1;
         }
         info!("Historical sync completed");
+
+        if self
+            .event_processor
+            .db
+            .state()
+            .get_all_operators()
+            .is_empty()
+        {
+            warn!("No OperatorAdded events found in historical sync, there is likely a sync error");
+        }
+
         Ok(())
     }
 

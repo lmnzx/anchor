@@ -1,113 +1,45 @@
 
-:::warning
-The Anchor client is currently under active development and should not be used in a
-production setting.
-:::
-
 # Welcome to Anchor
 
 **Anchor** is a high-performance Secret Shared Validators (SSV) client written in Rust, designed to enable distributed validator technology for Ethereum staking.
 
-## What is SSV?
+## SSV Overview
 
-Secret Shared Validators (SSV) is a protocol that splits a validator key into multiple shares, distributed across different operators. This approach provides:
+Secret Shared Validators (SSV) is a protocol that splits a validator key into multiple shares, distributed across different operators.
+Instead of running a validator on a single machine, SSV splits the validator's duties across multiple operators, creating a more resilient and decentralized staking infrastructure. This approach provides:
 
 - **Fault Tolerance**: Your validator remains online even if some operators go offline
 - **No Single Point of Failure**: No single operator can compromise your validator
 - **Slashing Protection**: Enhanced protection against slashing events
 - **Decentralization**: Distribute trust across multiple independent operators
 
-## Why Choose Anchor?
+## Why Anchor?
 
-Anchor stands out as an SSV client with several key advantages:
+Written in Rust, Anchor focuses on memory safety and security. As an independent implementation of the SSV protocol,
+Anchor promotes client diversity in the SSV space, reducing the risk of network-wide failures. A
+diverse set of client operators will significantly improve the resilience of the SSV network.
 
-### 🔒 **Security First**
-- Written in Rust for memory safety and security
-- Comprehensive fuzzing and security testing
-- Built by Sigma Prime, trusted Ethereum infrastructure experts
+Anchor is specifically optimized for efficiency, fast consensus and networking implementation.
 
-### ⚡ **High Performance**
-- Optimized for efficiency and low resource usage
-- Fast consensus and networking implementation
-- Minimal latency for time-sensitive validator duties
+## Contact
 
-### 🛠️ **Developer Friendly**
-- Clean, well-documented codebase
-- Extensive CLI tools for key management and operations
-- Active open-source development
+The best place to reach us in the
+[#anchor](https://discord.com/channels/605577013327167508/1376460624069918720) channel in our [Lighthouse
+discord server](https://discord.gg/cyAszAh).
 
-## Who Should Use Anchor?
-
-### Staking Pool Operators
-Run distributed validators with enhanced security and fault tolerance for your staking infrastructure.
-
-### Solo Stakers
-Increase the reliability of your validator setup by distributing risk across multiple operators.
-
-### SSV Network Operators
-Operate as part of the SSV network, providing validator services to other users.
-
-## Quick Start Paths
-
-Choose your path based on your role:
-
-:::code-group
-
-```bash [🎯 New to SSV]
-# Start here to understand the basics
-→ Read: What is SSV?
-→ Next: Installation Guide
-```
-
-```bash [⚙️ Run an Operator]
-# Become an SSV network operator
-→ Next: Installation → Running an Operator
-→ Then: Operator Configuration
-```
-
-```bash [🔑 Manage Keys]
-# Generate and split validator keys
-→ Next: Installation → CLI Reference
-→ Focus: Keygen and KeySplit tools
-```
-
-```bash [🧑‍💻 Developer]
-# Contribute or integrate
-→ Next: Development Environment
-→ Then: Architecture Overview
-```
-
-:::
-
-## Prerequisites
-
-Before getting started, ensure you have:
-
-- **System Requirements**: Linux, macOS, or Windows
-- **Rust** (if building from source): Version 1.88.0 or later
-- **Ethereum Knowledge**: Basic understanding of validators and staking
-- **Command Line**: Comfort with terminal/command prompt usage
-
-## What's Next?
-
-1. **[Installation](/installation)** - Get Anchor running on your system
-2. **[Running an Operator](/running_an_operator)** - Start operating in the SSV network
-3. **[CLI Reference](/cli)** - Master the command-line tools
-4. **[Architecture](/architecture)** - Understand Anchor's technical design
+For security related matters, please reach out to
+[security@sigmaprime.io](mailto:security@sigmaprime.io) and encrypt sensitive
+messages with our [PGP key](https://keybase.io/sigp/pgp_keys.asc?fingerprint=15e66d941f697e28f49381f426416dc3f30674b0).
 
 ## About This Documentation
 
-This documentation is open source and community-driven. We welcome contributions to help improve the experience for all users.
-
-- **Contribute**: [github.com/sigp/anchor/docs](https://github.com/sigp/anchor/tree/unstable/docs)
-- **Community Support**: [GitHub Discussions](https://github.com/sigp/anchor/discussions)
-- **Professional Support**: [Sigma Prime](https://sigmaprime.io)
+This documentation is open source and community-driven. We welcome [contributions](https://github.com/sigp/anchor/tree/unstable/docs) to help improve the experience for all users.
 
 ---
 
 :::tip
 Need Help?
 - Check our [FAQ](/faq) for common questions
-- Join the community on [GitHub](https://github.com/sigp/anchor)
+- Join the community on [Discord](https://discord.com/invite/cyAszAh)
 - Report issues or request features in our [issue tracker](https://github.com/sigp/anchor/issues)
 :::

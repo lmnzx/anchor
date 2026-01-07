@@ -10,10 +10,12 @@ export default defineConfig({
   // Community-focused
   aiCta: false,
 
+  // Enable theme toggle
+  themeToggle: true,
+
   // Open source theme - matching design3 background and theming
   theme: {
     accentColor: '#00d4aa',
-    colorScheme: 'dark',
     variables: {
       color: {
         background: { light: '#ffffff', dark: '#0a0a0a' },
@@ -32,7 +34,7 @@ export default defineConfig({
     { text: 'Documentation', link: '/introduction' },
     { text: 'GitHub', link: 'https://github.com/sigp/anchor' },
     {
-      text: 'v0.2.0',
+      text: 'v1.1.0',
       items: [
         {
           text: 'Releases',
@@ -52,20 +54,22 @@ export default defineConfig({
         text: 'Getting Started',
         items: [
           { text: 'Introduction', link: '/introduction' },
-          { text: 'What is SSV?', link: '/what_is_ssv' },
           { text: 'Installation', link: '/installation' },
           { text: 'Running an Operator', link: '/running_an_operator' },
+          { text: 'Running a Validator on SSV', link: '/running_a_validator_on_ssv' },
         ]
       },
       {
         text: 'Usage & Configuration',
         items: [
-          { text: 'CLI Reference', link: '/cli', collapsed: true,
+          { text: 'Migrate to Anchor', link: '/migrate_to_anchor' },
+          {
+            text: 'CLI Reference', link: '/cli', collapsed: true,
             items: [
-                    { text: 'Node', link: '/cli-node' },
-                    { text: 'Keygen', link: '/cli-keygen' },
-                    { text: 'KeySplit', link: '/cli-keysplit' },
-                   ]
+              { text: 'Node', link: '/cli-node' },
+              { text: 'Keygen', link: '/cli-keygen' },
+              { text: 'KeySplit', link: '/cli-keysplit' },
+            ]
           },
           { text: 'Metrics', link: '/metrics' },
           { text: 'Advanced Networking', link: '/advanced_networking' },
@@ -76,8 +80,10 @@ export default defineConfig({
         text: 'Development',
         items: [
           { text: 'Development Environment', link: '/development_environment' },
-          { text: 'Protocol Developers', link: '/protocol_developers', collapsed: true,
-            items: [ {text: 'SSV Handshake Protocol', link: '/handshake' } ] },
+          {
+            text: 'Protocol Developers', link: '/protocol_developers', collapsed: true,
+            items: [{ text: 'SSV Handshake Protocol', link: '/handshake' }]
+          },
           { text: 'Architecture', link: '/architecture' },
           { text: 'Contributing', link: '/contributing' },
         ]
@@ -95,9 +101,4 @@ export default defineConfig({
       link: 'https://x.com/sigp_io',
     },
   ],
-
-  editLink: {
-    pattern: "https://github.com/sigp/anchor/edit/unstable/book/docs/pages/:path",
-    text: "Edit this page"
-  },
 })
