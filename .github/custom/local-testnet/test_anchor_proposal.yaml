@@ -1,6 +1,6 @@
 id: test_anchor_proposal
 name: "Check for Anchor Proposal"
-timeout: 60m
+timeout: 30m
 tasks:
   - name: sleep
     config:
