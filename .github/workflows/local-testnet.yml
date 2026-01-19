@@ -18,7 +18,7 @@ jobs:
       - name: Build Docker Image
         # has to be Dockerfile.devnet as spec-minimal is necessary
         run: |
-          docker build -f Dockerfile.devnet -t node/anchor:latest . 
+          docker build -f Dockerfile.devnet -t node/anchor:latest .
           docker save node/anchor:latest -o anchor-docker.tar
 
       - name: Upload Docker Image Artifact
@@ -85,7 +85,7 @@ jobs:
           ${{ steps.assertoor_test_result.outputs.failed_test_details }}
           EOF
           )
-          
+
           echo "Test Result:  $test_result"
           echo "$test_status"
           if ! [ "$test_result" == "success" ]; then
