@@ -36,7 +36,7 @@ network:
     # NOTE: changes the number of slots in the epoch and potentially some other network settings.
     # docs: https://github.com/ethpandaops/ethereum-package/blob/main/README.md#configuration
     # Supported by Anchor.
-    #preset: minimal
+    preset: minimal
     seconds_per_slot: 6
 
   port_publisher:
